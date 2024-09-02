@@ -1,0 +1,159 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Plano de Estudos</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            background-color: #121212;
+            color: #fff;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 900px;
+            margin: 20px auto;
+            padding: 20px;
+            background-color: #1e1e1e;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
+        }
+
+        h1 {
+            color: #6a0dad;
+            text-align: center;
+        }
+
+        .input-section {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 20px;
+        }
+
+        input {
+            flex: 1;
+            padding: 10px;
+            margin: 0 5px;
+            border: none;
+            border-radius: 4px;
+            outline: none;
+        }
+
+        button {
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            background-color: #4b5320;
+            color: #fff;
+            cursor: pointer;
+        }
+
+        button:hover {
+            background-color: #2e382e;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-bottom: 20px;
+        }
+
+        th, td {
+            padding: 10px;
+            text-align: left;
+            border-bottom: 1px solid #ddd;
+        }
+
+        th {
+            background-color: #2a2a72;
+            color: white;
+        }
+
+        canvas {
+            width: 100%;
+            height: 400px;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Plano de Estudos</h1>
+
+        <div class="input-section">
+            <input type="date" id="date" placeholder="Data">
+            <input type="text" id="subject" placeholder="Matéria">
+            <input type="number" id="questions" placeholder="Questões Resolvidas">
+            <button onclick="addEntry()">Adicionar</button>
+        </div>
+
+        <table id="study-table">
+            <thead>
+                <tr>
+                    <th>Data</th>
+                    <th>Matéria</th>
+                    <th>Questões Resolvidas</th>
+                </tr>
+            </thead>
+            <tbody>
+                <!-- As entradas serão adicionadas aqui -->
+            </tbody>
+        </table>
+
+        <canvas id="studyChart"></canvas>
+    </div>
+
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script>
+        let studyData = [];
+
+        function addEntry() {
+            const date = document.getElementById('date').value;
+            const subject = document.getElementById('subject').value;
+            const questions = document.getElementById('questions').value;
+
+            if (date && subject && questions) {
+                studyData.push({ date, subject, questions: parseInt(questions) });
+                updateTable();
+                updateChart();
+            }
+        }
+
+        function updateTable() {
+            const tbody = document.querySelector('#study-table tbody');
+            tbody.innerHTML = '';
+
+            studyData.forEach((entry, index) => {
+                const row = document.createElement('tr');
+                row.innerHTML = `<td>${entry.date}</td><td>${entry.subject}</td><td>${entry.questions}</td>`;
+                tbody.appendChild(row);
+            });
+        }
+
+        function updateChart() {
+            const ctx = document.getElementById('studyChart').getContext('2d');
+            const labels = studyData.map(entry => entry.date);
+            const data = studyData.map(entry => entry.questions);
+
+            if (window.myChart) {
+                window.myChart.destroy();
+            }
+
+            window.myChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: labels,
+                    datasets: [{
+                        label: 'Questões Resolvidas por Dia',
+                        data: data,
+                        backgroundColor: 'rgba(106, 13, 173, 0.5)',
+                        borderColor: '#4b5320',
+                        borderWidth: 2
+                    }]
+                }
+            });
+        }
+    </script>
+</body>
+</html>
