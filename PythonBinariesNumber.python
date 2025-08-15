@@ -1,0 +1,13 @@
+# Solicita ao usuario um numero decimal
+decimal = int(input("Digite um número decimal: "))
+#Conversões de base
+binario = bin(decimal)
+octal = oct (decimal)
+hexadecimal = hex (decimal)
+# binário
+# octal
+# hexadecimal
+#Exibe os resultados
+print(f"Binário: {binario}")
+print(f"octal: {octal}")
+print(f"Hexadecimal: {hexadecimal}")
