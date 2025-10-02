@@ -1,0 +1,257 @@
+/*
+ * Sistema de Comprovação Metrológica - Protótipo em Java (single-file)
+ *
+ * Funcionalidades:
+ * - Gerenciar instrumentos (criar, listar)
+ * - Registrar ensaios/calibrações com medições
+ * - Calcular média, desvio padrão amostral (Type A) e incerteza combinada (exemplo simples)
+ * - Exportar relatório em CSV
+ *
+ * Como usar:
+ * 1) Salve este arquivo como SistemaComprovacaoMetrologica.java
+ * 2) Compile: javac SistemaComprovacaoMetrologica.java
+ * 3) Execute: java SistemaComprovacaoMetrologica
+ *
+ * Observações e melhorias sugeridas:
+ * - Persistência atual: memória. Trocar para banco de dados (SQLite, PostgreSQL) para produção.
+ * - Exportar para PDF/XLSX usando bibliotecas (Apache POI para Excel, iText ou OpenPDF para PDF).
+ * - Adicionar autenticação, permissões de usuário e log de auditoria.
+ * - Adicionar GUI (JavaFX / Swing) ou uma API REST (Spring Boot).
+ */
+
+import java.io.FileWriter;
+import java.io.IOException;
+import java.time.LocalDate;
+import java.time.format.DateTimeFormatter;
+import java.util.*;
+import java.util.stream.Collectors;
+
+public class SistemaComprovacaoMetrologica {
+
+    private static final Scanner scanner = new Scanner(System.in);
+    private static final CalibrationService service = new CalibrationService();
+    private static final DateTimeFormatter DF = DateTimeFormatter.ofPattern("yyyy-MM-dd");
+
+    public static void main(String[] args) {
+        System.out.println("=== Sistema de Comprovação Metrológica - Protótipo ===");
+        boolean running = true;
+        while (running) {
+            printMenu();
+            String opt = scanner.nextLine().trim();
+            switch (opt) {
+                case "1": createInstrument(); break;
+                case "2": listInstruments(); break;
+                case "3": registerCalibration(); break;
+                case "4": listCalibrations(); break;
+                case "5": exportCSV(); break;
+                case "0": running = false; break;
+                default: System.out.println("Opção inválida");
+            }
+        }
+        System.out.println("Encerrando...");
+    }
+
+    private static void printMenu() {
+        System.out.println();
+        System.out.println("1) Cadastrar instrumento");
+        System.out.println("2) Listar instrumentos");
+        System.out.println("3) Registrar calibração/ensaio");
+        System.out.println("4) Listar calibrações");
+        System.out.println("5) Exportar relatório CSV");
+        System.out.println("0) Sair");
+        System.out.print("Escolha: ");
+    }
+
+    private static void createInstrument() {
+        System.out.print("Nome do instrumento: ");
+        String nome = scanner.nextLine();
+        System.out.print("Modelo: ");
+        String modelo = scanner.nextLine();
+        System.out.print("Número de série: ");
+        String serial = scanner.nextLine();
+        Instrument inst = service.createInstrument(nome, modelo, serial);
+        System.out.println("Instrumento criado com ID: " + inst.getId());
+    }
+
+    private static void listInstruments() {
+        List<Instrument> lista = service.getAllInstruments();
+        if (lista.isEmpty()) {
+            System.out.println("Nenhum instrumento cadastrado.");
+            return;
+        }
+        System.out.println("Instrumentos:");
+        for (Instrument i : lista) {
+            System.out.println(i.getId() + " - " + i.getName() + " | Modelo: " + i.getModel() + " | S/N: " + i.getSerial());
+        }
+    }
+
+    private static void registerCalibration() {
+        listInstruments();
+        System.out.print("Informe o ID do instrumento: ");
+        String id = scanner.nextLine();
+        Optional<Instrument> oi = service.findInstrumentById(id);
+        if (!oi.isPresent()) { System.out.println("Instrumento não encontrado"); return; }
+        Instrument inst = oi.get();
+        System.out.print("Data da calibração (yyyy-MM-dd) [enter para hoje]: ");
+        String d = scanner.nextLine();
+        LocalDate date = d.isBlank() ? LocalDate.now() : LocalDate.parse(d, DF);
+        System.out.print("Responsável: ");
+        String resp = scanner.nextLine();
+        System.out.println("Insira as medições (uma por linha). Digite 'fim' para encerrar:");
+        List<Double> medidas = new ArrayList<>();
+        while (true) {
+            String line = scanner.nextLine().trim();
+            if (line.equalsIgnoreCase("fim")) break;
+            try {
+                double v = Double.parseDouble(line.replace(',', '.'));
+                medidas.add(v);
+            } catch (NumberFormatException ex) {
+                System.out.println("Valor inválido, tente novamente ou digite 'fim'.");
+            }
+        }
+        if (medidas.isEmpty()) { System.out.println("Nenhuma medição informada. Abortando."); return; }
+        CalibrationRecord rec = service.registerCalibration(inst, date, resp, medidas);
+        System.out.println("Calibração registrada. ID: " + rec.getId());
+        System.out.println(service.summary(rec));
+    }
+
+    private static void listCalibrations() {
+        List<CalibrationRecord> all = service.getAllCalibrations();
+        if (all.isEmpty()) { System.out.println("Nenhuma calibração registrada."); return; }
+        for (CalibrationRecord r : all) {
+            System.out.println(service.brief(r));
+        }
+    }
+
+    private static void exportCSV() {
+        System.out.print("Nome do arquivo CSV (ex: relatorio.csv): ");
+        String fn = scanner.nextLine().trim();
+        if (fn.isEmpty()) fn = "relatorio.csv";
+        try {
+            ReportGenerator.exportToCSV(service.getAllCalibrations(), fn);
+            System.out.println("Exportado com sucesso para: " + fn);
+        } catch (IOException e) {
+            System.out.println("Erro ao exportar: " + e.getMessage());
+        }
+    }
+
+    // -------------------- Classes internas (modelo + servicos) --------------------
+
+    static class Instrument {
+        private final String id;
+        private final String name;
+        private final String model;
+        private final String serial;
+
+        public Instrument(String id, String name, String model, String serial) {
+            this.id = id;
+            this.name = name;
+            this.model = model;
+            this.serial = serial;
+        }
+        public String getId() { return id; }
+        public String getName() { return name; }
+        public String getModel() { return model; }
+        public String getSerial() { return serial; }
+    }
+
+    static class CalibrationRecord {
+        private final String id;
+        private final Instrument instrument;
+        private final LocalDate date;
+        private final String technician;
+        private final List<Double> measurements;
+
+        // results
+        private final double mean;
+        private final double stdDevSample; // s
+        private final double uncertaintyTypeA; // s / sqrt(n)
+
+        public CalibrationRecord(String id, Instrument instrument, LocalDate date, String technician, List<Double> measurements) {
+            this.id = id;
+            this.instrument = instrument;
+            this.date = date;
+            this.technician = technician;
+            this.measurements = new ArrayList<>(measurements);
+            this.mean = Statistics.mean(this.measurements);
+            this.stdDevSample = Statistics.stdDevSample(this.measurements);
+            this.uncertaintyTypeA = this.stdDevSample / Math.sqrt(this.measurements.size());
+        }
+
+        public String getId() { return id; }
+        public Instrument getInstrument() { return instrument; }
+        public LocalDate getDate() { return date; }
+        public String getTechnician() { return technician; }
+        public List<Double> getMeasurements() { return Collections.unmodifiableList(measurements); }
+        public double getMean() { return mean; }
+        public double getStdDevSample() { return stdDevSample; }
+        public double getUncertaintyTypeA() { return uncertaintyTypeA; }
+    }
+
+    static class CalibrationService {
+        private final Map<String, Instrument> instruments = new LinkedHashMap<>();
+        private final Map<String, CalibrationRecord> records = new LinkedHashMap<>();
+
+        public Instrument createInstrument(String name, String model, String serial) {
+            String id = UUID.randomUUID().toString().substring(0, 8);
+            Instrument i = new Instrument(id, name, model, serial);
+            instruments.put(id, i);
+            return i;
+        }
+
+        public List<Instrument> getAllInstruments() { return new ArrayList<>(instruments.values()); }
+
+        public Optional<Instrument> findInstrumentById(String id) { return Optional.ofNullable(instruments.get(id)); }
+
+        public CalibrationRecord registerCalibration(Instrument inst, LocalDate date, String technician, List<Double> measurements) {
+            String id = UUID.randomUUID().toString().substring(0, 8);
+            CalibrationRecord r = new CalibrationRecord(id, inst, date, technician, measurements);
+            records.put(id, r);
+            return r;
+        }
+
+        public List<CalibrationRecord> getAllCalibrations() { return new ArrayList<>(records.values()); }
+
+        public String summary(CalibrationRecord r) {
+            return String.format("Resumo - ID:%s | Inst:%s | Data:%s | n=%d | Média=%.6f | s=%.6f | uA=%.6f",
+                    r.getId(), r.getInstrument().getName(), r.getDate().format(DF), r.getMeasurements().size(), r.getMean(), r.getStdDevSample(), r.getUncertaintyTypeA());
+        }
+
+        public String brief(CalibrationRecord r) {
+            return String.format("%s | %s | %s | n=%d | média=%.6f | uA=%.6f", r.getId(), r.getInstrument().getName(), r.getDate().format(DF), r.getMeasurements().size(), r.getMean(), r.getUncertaintyTypeA());
+        }
+    }
+
+    static class Statistics {
+        public static double mean(List<Double> vals) {
+            double sum = 0.0;
+            for (double v : vals) sum += v;
+            return sum / vals.size();
+        }
+
+        public static double stdDevSample(List<Double> vals) {
+            int n = vals.size();
+            if (n < 2) return 0.0;
+            double m = mean(vals);
+            double ss = 0.0;
+            for (double v : vals) ss += (v - m) * (v - m);
+            return Math.sqrt(ss / (n - 1));
+        }
+    }
+
+    static class ReportGenerator {
+        public static void exportToCSV(List<CalibrationRecord> records, String filename) throws IOException {
+            try (FileWriter fw = new FileWriter(filename)) {
+                // header
+                fw.write("cal_id,instrument_id,instrument_name,date,technician,n,mean,stddev_sample,uncertainty_typeA,measurements\n");
+                for (CalibrationRecord r : records) {
+                    String measurements = r.getMeasurements().stream().map(d -> String.format(Locale.ROOT, "%.6f", d)).collect(Collectors.joining(";"));
+                    fw.write(String.format(Locale.ROOT, "%s,%s,%s,%s,%s,%d,%.6f,%.6f,%.6f,\"%s\"\n",
+                            r.getId(), r.getInstrument().getId(), esc(r.getInstrument().getName()), r.getDate().format(DF), esc(r.getTechnician()), r.getMeasurements().size(), r.getMean(), r.getStdDevSample(), r.getUncertaintyTypeA(), measurements));
+                }
+            }
+        }
+        private static String esc(String s) { return s.replace("\n", " ").replace(",", " "); }
+    }
+
+}
