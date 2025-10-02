@@ -1,0 +1,39 @@
+import numpy as np
+  from scipy.linalg import lu_factor, lu_solve
+   
+  def resolver_sistema_lu_scipy_simples(A, b):
+     """
+     Resolve um sistema linear Ax = b usando decomposição LU com     
+        SciPy.
+     Esta é uma versão simplificada que foca os passos principais.
+  
+     Args:
+        A (np.ndarray): Matriz de coeficientes.
+        b (np.ndarray): Vetor de termos independentes.
+ 
+    Returns:
+        np.ndarray: Vetor solução x.
+                    
+    """
+    # 1. Realizar a decomposição LU com pivotação (PA = LU)
+    # lu_factor retorna uma tupla (lu_matrix, pivot_indices)
+    lu, piv = lu_factor(A)
+ 
+     # 2. Resolver o sistema usando os fatores LU e os pivôs
+     # lu_solve resolve Ly = Pb e depois Ux = y
+     x = lu_solve((lu, piv), b)
+     
+     return x
+ 
+ A = np.array([[2, 1, 1],
+             [4, 3, 3],
+              [6, 5, 4]], dtype=float)
+
+ b = np.array([5, 11, 17], dtype=float)
+  
+ print("Matriz A:\n", A)
+ print("Vetor b:\n", b)
+ solucao_x = resolver_sistema_lu_scipy_simples(A, b)
+ print("\nSolução x (via LU com SciPy):")
+ print(solucao_x)
+  
